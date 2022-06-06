@@ -22,27 +22,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.VisibleForTesting
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.samples.crane.base.Result
 import androidx.compose.samples.crane.data.ExploreModel
 import androidx.compose.samples.crane.ui.CraneTheme
@@ -65,14 +48,24 @@ import com.google.maps.android.ktx.awaitMap
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-internal const val KEY_ARG_DETAILS_CITY_NAME = "KEY_ARG_DETAILS_CITY_NAME"
+internal const val KEY_ARG_DETAILS_CITY_NAME =
+    "KEY_ARG_DETAILS_CITY_NAME"
+
+data class DetailsUiState(
+    val cityDetails: ExploreModel? = null,
+    val isLoading: Boolean = false,
+    val throwError: Boolean = false
+)
 
 fun launchDetailsActivity(context: Context, item: ExploreModel) {
     context.startActivity(createDetailsActivityIntent(context, item))
 }
 
 @VisibleForTesting
-fun createDetailsActivityIntent(context: Context, item: ExploreModel): Intent {
+fun createDetailsActivityIntent(
+    context: Context,
+    item: ExploreModel
+): Intent {
     val intent = Intent(context, DetailsActivity::class.java)
     intent.putExtra(KEY_ARG_DETAILS_CITY_NAME, item.city.name)
     return intent
@@ -112,11 +105,37 @@ fun DetailsScreen(
     viewModel: DetailsViewModel = viewModel()
 ) {
     // TODO Codelab: produceState step - Show loading screen while fetching city details
-    val cityDetails = remember(viewModel) { viewModel.cityDetails }
-    if (cityDetails is Result.Success<ExploreModel>) {
-        DetailsContent(cityDetails.data, modifier.fillMaxSize())
-    } else {
-        onErrorLoading()
+    val uiState by produceState(
+        initialValue = DetailsUiState(
+            isLoading = true
+        )
+    ) {
+        val cityDetailsResult = viewModel.cityDetails
+        value =
+            if (cityDetailsResult is Result.Success<ExploreModel>) {
+                DetailsUiState(cityDetailsResult.data)
+            } else {
+                DetailsUiState(throwError = true)
+            }
+    }
+    when {
+        uiState.cityDetails != null -> {
+            DetailsContent(
+                exploreModel = uiState.cityDetails!!,
+                modifier.fillMaxSize()
+            )
+        }
+        uiState.isLoading -> {
+            Box(modifier.fillMaxSize()) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colors.onSurface,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+        else -> {
+            onErrorLoading()
+        }
     }
 }
 
@@ -125,7 +144,10 @@ fun DetailsContent(
     exploreModel: ExploreModel,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.Center) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center
+    ) {
         Spacer(Modifier.height(32.dp))
         Text(
             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -140,7 +162,10 @@ fun DetailsContent(
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(16.dp))
-        CityMapView(exploreModel.city.latitude, exploreModel.city.longitude)
+        CityMapView(
+            exploreModel.city.latitude,
+            exploreModel.city.longitude
+        )
     }
 }
 
@@ -167,7 +192,11 @@ private fun MapViewContainer(
     LaunchedEffect(map) {
         val googleMap = map.awaitMap()
         googleMap.addMarker { position(cameraPosition) }
-        googleMap.moveCamera(CameraUpdateFactory.newLatLng(cameraPosition))
+        googleMap.moveCamera(
+            CameraUpdateFactory.newLatLng(
+                cameraPosition
+            )
+        )
     }
 
     var zoom by rememberSaveable(map) { mutableStateOf(InitialZoom) }
@@ -184,7 +213,11 @@ private fun MapViewContainer(
             val googleMap = mapView.awaitMap()
             googleMap.setZoom(mapZoom)
             // Move camera to the same place to trigger the zoom update
-            googleMap.moveCamera(CameraUpdateFactory.newLatLng(cameraPosition))
+            googleMap.moveCamera(
+                CameraUpdateFactory.newLatLng(
+                    cameraPosition
+                )
+            )
         }
     }
 }
@@ -194,7 +227,10 @@ private fun ZoomControls(
     zoom: Float,
     onZoomChanged: (Float) -> Unit
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
         ZoomButton("-", onClick = { onZoomChanged(zoom * 0.8f) })
         ZoomButton("+", onClick = { onZoomChanged(zoom * 1.2f) })
     }
